@@ -1,0 +1,333 @@
+Problem 1
+
+```{r}
+#Importing the dataset
+car<-data.frame(mtcars)
+```
+
+```{r}
+#Check Structure of dataset
+str(car)
+```
+```{r}
+library(caret)
+set.seed(200)
+partition <- createDataPartition(car$am,times=1,p=0.8,list = F)
+train <- car[partition,]
+test <- car[-partition,]
+```
+```{r}
+#fiitting a linear model
+model <- lm(mpg~.,data=train)
+
+#MSE on test set
+mean((predict(model,test)-test$mpg)^2)
+summary(model)
+coef(model)
+```
+Only Attribute "wt" is relevant
+
+
+Ridge Regression
+```{r}
+# Loading the library
+library(glmnet)
+```
+
+```{r}
+# Getting the independent variable
+x <- model.matrix(mpg~.,train)[,-1]
+
+
+# Getting the dependent variable
+y <- train$mpg
+```
+
+
+Cross Validation using GLMNET
+```{r}
+# Setting the range of lambda values
+lambda_seq <- 10^seq(5,-5,by = -.1)
+
+# Using cross validation glmnet
+ridge_cv <- cv.glmnet(x, y, alpha = 0,lambda = lambda_seq)
+plot(ridge_cv)
+
+```
+
+
+```{r}
+#Best lambda value
+best_lambda <- ridge_cv$lambda.min
+best_lambda
+
+```
+
+```{r}
+# Building the Ridge Regression Model using GLMNET
+fit <- glmnet(x, y, alpha = 0, lambda  = best_lambda)
+```
+
+
+```{r}
+summary(fit)
+
+```
+
+
+```{r}
+coef(ridge_cv,s="lambda.min")
+```
+
+
+```{r}
+# Test Dataset
+x1 =  model.matrix(mpg~.,test)[,-1]
+model_predict <- predict(fit,s =,newx = x1, type = "response")
+
+#MSE on test data
+mean((model_predict-test$mpg)^2)
+```
+We can see that MSE on test data will decreases from 10.71 to 1.18 by
+performing Ridge Regression.
+As we can see after Ridge Regression the coefficients have  shrunk and are more close to zero but none of them are perfect zero.
+Hence Ridge Regression has performed shrinkage.
+
+
+
+
+
+
+Problem 2
+
+```{r}
+library(ggplot2)
+library(lattice)
+library(caret)
+#Importing the dataset
+data <- data.frame(swiss)
+
+```
+
+
+```{r}
+
+#80-20 split using createDataPartition
+set.seed(150)
+partition <- createDataPartition(data$Fertility,p=0.8,list = F)
+train <- data[partition,]
+test <- data[-partition,]
+
+```
+
+
+```{r}
+#fitting a linear fit
+model <- lm(Fertility~.,train)
+
+summary(model)
+
+```
+Agriculture, Examination, Catholic and Infant Mortality are relevant feature with coefficients as -0.17497, -0.05176,
+0.11713, 1.03247
+
+
+
+
+```{r}
+#calculating test mse
+mean((test$Fertility-predict(model,test))^2)
+```
+
+Lasso Regression
+```{r}
+# Loaging the library
+library(Matrix)
+library(foreach)
+library(glmnet)
+# Getting the independent variable
+x <- model.matrix(Fertility~.,train)[,-1]
+
+# Getting the dependent variable
+y <- train$Fertility
+```
+
+Cross Validation Lasso GLMNET
+```{r}
+# Setting the range of lambda values
+lambda_seq <- 10^seq(5,-5,by = -.1)
+
+# Using cross validation glmnet
+lasso_cv <- cv.glmnet(x, y, alpha = 1,lambda = lambda_seq)
+plot(lasso_cv)
+
+```
+
+
+```{r}
+#Best lambda value
+best_lambda <- lasso_cv$lambda.min
+best_lambda
+
+```
+
+```{r}
+# Using glmnet function to build the ridge regression model
+fit <- glmnet(x, y, alpha = 1, lambda  = best_lambda)
+
+# Checking the model
+summary(fit)
+
+```
+
+
+```{r}
+#for testdata
+x2 =  model.matrix(Fertility~.,test)[,-1]
+model_predict <- predict(fit,s =,newx = x2, type = "response")
+```
+
+
+```{r}
+#MSE on test data
+mean((model_predict-test$Fertility)^2)
+```
+
+
+```{r}
+#coefficients
+coef(model)
+coef(lasso_cv)
+```
+Compared to Linear fit Lasso Regularization has shrinked the coefficients and two of them are shrinked to
+zero.
+
+
+
+Problem 3
+```{r}
+concrete <- read.csv("D:\\Temp\\Concrete_Data.csv")
+summary(concrete)
+```
+
+Changing the Column names
+Taking Columns C1-C6
+```{r}
+colnames(concrete) = c("cem", "bfs", "fa", "water", "sp", "cagg", "fagg", "age", "ccs")
+keeps = c("cem", "bfs", "fa", "water", "sp", "cagg", "ccs")
+concrete = concrete[keeps]
+summary(concrete)
+```
+
+```{r}
+library(corrplot)
+corrplot(cor(concrete), method = "number")
+```
+
+```{r}
+
+library(mgcv)
+model1 <- gam(ccs ~ cem + bfs + fa + water + sp + cagg , data=concrete)
+summary(model1)
+
+```
+It appears we have statistical effects for CEM, BFS, but not for CAGG and the adjusted R-squared suggests a notable amount of the variance.
+
+Using Smoothing Function
+```{r}
+model2 <- gam(ccs ~ s(cem) + s(bfs) + s(fa) + s(water) + s(sp) + s(cagg) , data=concrete)
+summary(model2)
+```
+
+We can also note that this model accounts for much of the variance in CCS , with an adjusted R-squared of .531 . In short, it looks like the CEM is associated with CCS.
+
+
+
+```{r}
+model1.sse <- sum(fitted(model1)-concrete$ccs)^2
+model1.ssr <- sum(fitted(model1) -mean(concrete$ccs))^2
+model1.sst = model1.sse + model1.ssr
+
+rsqr_main=1-(model1.sse/model1.sst)
+print(rsqr_main)
+```
+```{r}
+model2.sse <- sum(fitted(model2)-concrete$ccs)^2
+model2.ssr <- sum(fitted(model2) -mean(concrete$ccs))^2
+model2.sst = model2.sse + model2.ssr
+
+rsqr_sm=1-(model2.sse/model2.sst)
+print(rsqr_sm)
+```
+
+
+Comparison of Model
+```{r}
+anova(model1, model2, test="Chisq")
+
+```
+
+We couldn’t have assumed as such already, but now we have additional statistical evidence to suggest that incorporating nonlinear relationships of the covariates improves the model.
+
+
+Visualizing with Visreg Library
+```{r}
+library(visreg)
+visreg(model1,'cem')
+visreg(model2,'cem') 
+```
+The result is a plot of how the expected value of the CCS changes as a function of x (CEM), with all other variables in the model held fixed.
+It includes 
+(1) the expected value (blue line) 
+(2) a confidence interval for the expected value (gray band)
+(3) partial residuals (dark gray dots).
+
+
+
+```{r}
+visreg(model1,'bfs') 
+visreg(model2,'bfs') 
+```
+
+```{r}
+visreg(model1,'fa') 
+visreg(model2,'fa')
+```
+
+```{r}
+visreg(model1,'water') 
+visreg(model2,'water')
+```
+
+```{r}
+visreg(model1,'sp') 
+visreg(model2,'sp')
+```
+
+
+```{r}
+visreg(model1,'cagg') 
+visreg(model2,'cagg')
+```
+
+
+
+From CEM  graph we can see that, the confidence interval after applying smoothing function has greater value as compared to the model before smoothing function.
+After applying the smoothing function, the confidence interval gets better.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
